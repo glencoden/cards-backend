@@ -1,12 +1,22 @@
-use axum::{extract::State, http::StatusCode, response::Json, routing::get, Router};
-use dotenv::dotenv;
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    response::Json,
+    routing::get,
+    Router,
+};
+use dotenvy::dotenv;
 use serde::Serialize;
 use serde_json::{json, Value};
-use sqlx::{postgres::PgPoolOptions, Error as SqlxError, Pool, Postgres};
+use sqlx::{
+    postgres::PgPoolOptions, query_builder::QueryBuilder, Error as SqlxError, Pool, Postgres,
+};
 use std::sync::Arc;
 use std::{env, net::SocketAddr};
 
 // db models
+
+// TODO: combine User structs and add Options
 
 #[derive(serde::Serialize)]
 struct User {
@@ -17,7 +27,26 @@ struct User {
     email: String,
 }
 
+#[derive(serde::Deserialize)]
+struct UserCreatePayload {
+    name: String,
+    first: String,
+    last: String,
+    email: String,
+}
+
+#[derive(serde::Deserialize)]
+struct UserUpdatePayload {
+    id: i32,
+    name: Option<String>,
+    first: Option<String>,
+    last: Option<String>,
+    email: Option<String>,
+}
+
 // response models
+
+// TODO: decide where to send custom errors in response
 
 // #[derive(serde::Serialize)]
 // enum ApiResponse<'a, T: Serialize> {
@@ -42,6 +71,11 @@ struct ApiResponseVariantOk<T: Serialize> {
 //     message: str,
 // }
 
+#[derive(serde::Serialize)]
+struct DbInsertResult {
+    rows_affected: u64,
+}
+
 // global state
 
 struct AppState {
@@ -50,9 +84,9 @@ struct AppState {
 
 #[tokio::main]
 async fn main() -> Result<(), SqlxError> {
-    // db
+    dotenv().unwrap();
 
-    dotenv().ok();
+    // db
 
     let db_url = env::var("DATABASE_URL").unwrap();
 
@@ -63,13 +97,14 @@ async fn main() -> Result<(), SqlxError> {
 
     // state
 
-    let shared_state = Arc::new(AppState { pool });
+    let app_state = Arc::new(AppState { pool });
 
     // sever
 
     let app = Router::new()
-        .route("/users", get(get_users))
-        .with_state(shared_state);
+        .route("/users", get(read_users).post(create_user).put(update_user))
+        .route("/users/:user_id", get(read_user).delete(delete_user))
+        .with_state(app_state);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
 
@@ -82,19 +117,138 @@ async fn main() -> Result<(), SqlxError> {
 
 // route handlers
 
-async fn get_users(State(app_state): State<Arc<AppState>>) -> Result<Json<Value>, StatusCode> {
-    let users_result = sqlx::query_as!(User, "SELECT * FROM users")
+async fn read_users(State(app_state): State<Arc<AppState>>) -> Result<Json<Value>, StatusCode> {
+    let result = sqlx::query_as!(User, "SELECT * FROM users")
         .fetch_all(&app_state.pool)
         .await;
 
-    if let Ok(users) = users_result {
+    if let Ok(users) = result {
         Ok(to_json_response(users))
     } else {
         Err(StatusCode::INTERNAL_SERVER_ERROR)
     }
 }
 
-// util
+async fn read_user(
+    State(app_state): State<Arc<AppState>>,
+    Path(user_id): Path<i32>,
+) -> Result<Json<Value>, StatusCode> {
+    let result = sqlx::query_as!(User, "SELECT * FROM users WHERE id = $1", user_id)
+        .fetch_all(&app_state.pool)
+        .await;
+
+    if let Ok(users) = result {
+        Ok(to_json_response(users))
+    } else {
+        Err(StatusCode::INTERNAL_SERVER_ERROR)
+    }
+}
+
+async fn create_user(
+    State(app_state): State<Arc<AppState>>,
+    Json(payload): Json<UserCreatePayload>,
+) -> Result<Json<Value>, StatusCode> {
+    let result = sqlx::query!(
+        "INSERT INTO users (name, first, last, email) VALUES ($1, $2, $3, $4)",
+        payload.name,
+        payload.first,
+        payload.last,
+        payload.email,
+    )
+    .execute(&app_state.pool)
+    .await;
+
+    if let Ok(pg_query_result) = result {
+        Ok(to_json_response(DbInsertResult {
+            rows_affected: pg_query_result.rows_affected(),
+        }))
+    } else {
+        Err(StatusCode::INTERNAL_SERVER_ERROR)
+    }
+}
+
+async fn update_user(
+    State(app_state): State<Arc<AppState>>,
+    Json(payload): Json<UserUpdatePayload>,
+) -> Result<Json<Value>, StatusCode> {
+    let mut query = QueryBuilder::new("UPDATE users SET");
+
+    let mut num_updates = 0;
+
+    // TODO: iterate over fields and extract as helper function
+
+    if let Some(name) = payload.name {
+        if num_updates > 0 {
+            query.push(",");
+        }
+        query.push(" name =");
+        query.push_bind(name);
+        num_updates += 1;
+    }
+
+    if let Some(first) = payload.first {
+        if num_updates > 0 {
+            query.push(",");
+        }
+        query.push(" first =");
+        query.push_bind(first);
+        num_updates += 1;
+    }
+
+    if let Some(last) = payload.last {
+        if num_updates > 0 {
+            query.push(",");
+        }
+        query.push(" last =");
+        query.push_bind(last);
+        num_updates += 1;
+    }
+
+    if let Some(email) = payload.email {
+        if num_updates > 0 {
+            query.push(",");
+        }
+        query.push(" email =");
+        query.push_bind(email);
+        num_updates += 1;
+    }
+
+    if num_updates == 0 {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    query.push(" WHERE id =");
+    query.push_bind(payload.id);
+
+    let result = query.build().execute(&app_state.pool).await;
+
+    if let Ok(pg_query_result) = result {
+        Ok(to_json_response(DbInsertResult {
+            rows_affected: pg_query_result.rows_affected(),
+        }))
+    } else {
+        Err(StatusCode::INTERNAL_SERVER_ERROR)
+    }
+}
+
+async fn delete_user(
+    State(app_state): State<Arc<AppState>>,
+    Path(user_id): Path<i32>,
+) -> Result<Json<Value>, StatusCode> {
+    let result = sqlx::query!("DELETE FROM users WHERE id = $1", user_id)
+        .execute(&app_state.pool)
+        .await;
+
+    if let Ok(pg_query_result) = result {
+        Ok(to_json_response(DbInsertResult {
+            rows_affected: pg_query_result.rows_affected(),
+        }))
+    } else {
+        Err(StatusCode::INTERNAL_SERVER_ERROR)
+    }
+}
+
+// helpers
 
 fn to_json_response<T: Serialize>(data: T) -> Json<Value> {
     let result = ApiResponseVariantOk { data, error: () };

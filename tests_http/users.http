@@ -1,0 +1,36 @@
+GET localhost:3000/users
+Accept: application/json
+
+###
+
+GET localhost:3000/users/3
+Accept: application/json
+
+###
+
+POST localhost:3000/users
+Content-Type: application/json
+
+{
+    "name": "Glen",
+    "first": "Volker",
+    "last": "Project",
+    "email": "volker@project.com"
+}
+
+###
+
+PUT localhost:3000/users
+Content-Type: application/json
+
+{
+    "id": 3,
+    "name": "Uwe",
+    "first": "Glen",
+    "last": "Coden"
+}
+
+###
+
+DELETE localhost:3000/users/4
+Content-Type: application/json
