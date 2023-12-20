@@ -90,8 +90,10 @@ where
 struct HomeTemplate;
 
 #[derive(Template)]
-#[template(path = "glen.html")]
-struct GlenTemplate;
+#[template(path = "users.html")]
+struct UsersTemplate {
+    users: Vec<User>,
+}
 
 // global state
 
@@ -114,22 +116,20 @@ async fn main() -> Result<(), SqlxError> {
         .connect(&db_url)
         .await?;
 
-    // state
+    // sever
 
     let app_state = Arc::new(AppState { pool });
 
-    // sever
-
     let root_path = env::current_dir().unwrap();
 
+    let api_router = Router::new()
+        .route("/users", get(get_users).post(create_user).put(update_user))
+        .route("/users/:user_id", get(read_user).delete(delete_user));
+
     let app = Router::new()
+        .nest("/api", api_router)
         .route("/", get(page_home))
-        .route("/glen", get(page_glen))
-        .route(
-            "/api/users",
-            get(read_users).post(create_user).put(update_user),
-        )
-        .route("/api/users/:user_id", get(read_user).delete(delete_user))
+        .route("/users", get(users_page))
         .nest_service(
             "/assets",
             ServeDir::new(format!("{}/assets", root_path.to_str().unwrap())),
@@ -154,18 +154,34 @@ async fn page_home() -> impl IntoResponse {
     HtmlResponse(template)
 }
 
-async fn page_glen() -> impl IntoResponse {
-    let template = GlenTemplate {};
+async fn users_page(State(app_state): State<Arc<AppState>>) -> impl IntoResponse {
+    let result = read_users(&app_state).await;
 
-    HtmlResponse(template)
+    if let Ok(users) = result {
+        let template = UsersTemplate { users };
+
+        HtmlResponse(template)
+    } else {
+        // TODO: add error template
+
+        let template = UsersTemplate { users: Vec::new() };
+
+        HtmlResponse(template)
+    }
 }
 
 // api route handlers
 
-async fn read_users(State(app_state): State<Arc<AppState>>) -> Result<Json<Value>, StatusCode> {
-    let result = sqlx::query_as!(User, "SELECT * FROM users")
+// TODO: either extract all db logic or find a way to call api from website route handlers
+
+async fn read_users(app_state: &Arc<AppState>) -> Result<Vec<User>, SqlxError> {
+    sqlx::query_as!(User, "SELECT * FROM users")
         .fetch_all(&app_state.pool)
-        .await;
+        .await
+}
+
+async fn get_users(State(app_state): State<Arc<AppState>>) -> Result<Json<Value>, StatusCode> {
+    let result = read_users(&app_state).await;
 
     // TODO: set status code and simply pass result to to_json_response
 
