@@ -1,16 +1,16 @@
 ### read all
 
-GET localhost:3000/users
+GET localhost:3000/api/users
 Accept: application/json
 
 ### read one
 
-GET localhost:3000/users/1
+GET localhost:3000/api/users/1
 Accept: application/json
 
 ### create
 
-POST localhost:3000/users
+POST localhost:3000/api/users
 Content-Type: application/json
 
 {
@@ -22,7 +22,7 @@ Content-Type: application/json
 
 ### update
 
-PUT localhost:3000/users
+PUT localhost:3000/api/users
 Content-Type: application/json
 
 {
@@ -34,5 +34,5 @@ Content-Type: application/json
 
 ### delete
 
-DELETE localhost:3000/users/5
+DELETE localhost:3000/api/users/5
 Content-Type: application/json

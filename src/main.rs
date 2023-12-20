@@ -1,7 +1,8 @@
+use askama::Template;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
-    response::Json,
+    response::{Html, IntoResponse, Json, Response},
     routing::get,
     Router,
 };
@@ -14,9 +15,9 @@ use sqlx::{
 use std::sync::Arc;
 use std::{env, net::SocketAddr};
 
-// db models
+// db model
 
-// TODO: combine User structs and add Options
+// TODO: combine User structs and add Options > create http test flow
 
 #[derive(serde::Serialize)]
 struct User {
@@ -44,7 +45,7 @@ struct UserUpdatePayload {
     email: Option<String>,
 }
 
-// response models
+// json response model
 
 #[derive(serde::Serialize)]
 struct ApiResponse<T: Serialize> {
@@ -62,11 +63,39 @@ struct DbInsertResult {
     rows_affected: u64,
 }
 
+// html response model
+
+struct HtmlResponse<T>(T);
+
+impl<T> IntoResponse for HtmlResponse<T>
+where
+    T: Template,
+{
+    fn into_response(self) -> Response {
+        match self.0.render() {
+            Ok(html) => Html(html).into_response(),
+            Err(err) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to render template. Error: {}", err),
+            )
+                .into_response(),
+        }
+    }
+}
+
+// askama templates
+
+#[derive(Template)]
+#[template(path = "test.html")]
+struct TestTemplate;
+
 // global state
 
 struct AppState {
     pool: Pool<Postgres>,
 }
+
+// main
 
 #[tokio::main]
 async fn main() -> Result<(), SqlxError> {
@@ -88,11 +117,16 @@ async fn main() -> Result<(), SqlxError> {
     // sever
 
     let app = Router::new()
-        .route("/users", get(read_users).post(create_user).put(update_user))
-        .route("/users/:user_id", get(read_user).delete(delete_user))
+        .route("/", get(test))
+        .route(
+            "/api/users",
+            get(read_users).post(create_user).put(update_user),
+        )
+        .route("/api/users/:user_id", get(read_user).delete(delete_user))
         .with_state(app_state);
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let port = 3000_u16;
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
 
@@ -101,7 +135,15 @@ async fn main() -> Result<(), SqlxError> {
     Ok(())
 }
 
-// route handlers
+// website route handlers
+
+async fn test() -> impl IntoResponse {
+    let template = TestTemplate {};
+
+    HtmlResponse(template)
+}
+
+// api route handlers
 
 async fn read_users(State(app_state): State<Arc<AppState>>) -> Result<Json<Value>, StatusCode> {
     let result = sqlx::query_as!(User, "SELECT * FROM users")
