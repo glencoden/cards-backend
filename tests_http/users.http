@@ -1,12 +1,14 @@
+### read all
+
 GET localhost:3000/users
 Accept: application/json
 
-###
+### read one
 
-GET localhost:3000/users/3
+GET localhost:3000/users/1
 Accept: application/json
 
-###
+### create
 
 POST localhost:3000/users
 Content-Type: application/json
@@ -18,19 +20,19 @@ Content-Type: application/json
     "email": "volker@project.com"
 }
 
-###
+### update
 
 PUT localhost:3000/users
 Content-Type: application/json
 
 {
-    "id": 3,
+    "id": 5,
     "name": "Uwe",
     "first": "Glen",
     "last": "Coden"
 }
 
-###
+### delete
 
-DELETE localhost:3000/users/4
+DELETE localhost:3000/users/5
 Content-Type: application/json

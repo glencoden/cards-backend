@@ -46,30 +46,16 @@ struct UserUpdatePayload {
 
 // response models
 
-// TODO: decide where to send custom errors in response
-
-// #[derive(serde::Serialize)]
-// enum ApiResponse<'a, T: Serialize> {
-//     Ok(ApiResponseVariantOk<T>),
-//     Err(&'a ApiResponseVariantErr),
-// }
-
 #[derive(serde::Serialize)]
-struct ApiResponseVariantOk<T: Serialize> {
-    data: T,
-    error: (),
+struct ApiResponse<T: Serialize> {
+    data: Option<T>,
+    error: Option<ApiResponseError>,
 }
 
-// #[derive(serde::Serialize)]
-// struct ApiResponseVariantErr {
-//     data: (),
-//     error: ApiResponseError,
-// }
-//
-// #[derive(serde::Serialize)]
-// struct ApiResponseError {
-//     message: str,
-// }
+#[derive(serde::Serialize)]
+struct ApiResponseError {
+    message: String,
+}
 
 #[derive(serde::Serialize)]
 struct DbInsertResult {
@@ -122,8 +108,10 @@ async fn read_users(State(app_state): State<Arc<AppState>>) -> Result<Json<Value
         .fetch_all(&app_state.pool)
         .await;
 
+    // TODO: set status code and simply pass result to to_json_response
+
     if let Ok(users) = result {
-        Ok(to_json_response(users))
+        Ok(to_json_response(Ok(users)))
     } else {
         Err(StatusCode::INTERNAL_SERVER_ERROR)
     }
@@ -138,7 +126,7 @@ async fn read_user(
         .await;
 
     if let Ok(users) = result {
-        Ok(to_json_response(users))
+        Ok(to_json_response(Ok(users)))
     } else {
         Err(StatusCode::INTERNAL_SERVER_ERROR)
     }
@@ -159,9 +147,9 @@ async fn create_user(
     .await;
 
     if let Ok(pg_query_result) = result {
-        Ok(to_json_response(DbInsertResult {
+        Ok(to_json_response(Ok(DbInsertResult {
             rows_affected: pg_query_result.rows_affected(),
-        }))
+        })))
     } else {
         Err(StatusCode::INTERNAL_SERVER_ERROR)
     }
@@ -223,9 +211,9 @@ async fn update_user(
     let result = query.build().execute(&app_state.pool).await;
 
     if let Ok(pg_query_result) = result {
-        Ok(to_json_response(DbInsertResult {
+        Ok(to_json_response(Ok(DbInsertResult {
             rows_affected: pg_query_result.rows_affected(),
-        }))
+        })))
     } else {
         Err(StatusCode::INTERNAL_SERVER_ERROR)
     }
@@ -240,9 +228,9 @@ async fn delete_user(
         .await;
 
     if let Ok(pg_query_result) = result {
-        Ok(to_json_response(DbInsertResult {
+        Ok(to_json_response(Ok(DbInsertResult {
             rows_affected: pg_query_result.rows_affected(),
-        }))
+        })))
     } else {
         Err(StatusCode::INTERNAL_SERVER_ERROR)
     }
@@ -250,8 +238,17 @@ async fn delete_user(
 
 // helpers
 
-fn to_json_response<T: Serialize>(data: T) -> Json<Value> {
-    let result = ApiResponseVariantOk { data, error: () };
+fn to_json_response<T: Serialize>(result: Result<T, ApiResponseError>) -> Json<Value> {
+    let response = match result {
+        Ok(data) => ApiResponse {
+            data: Some(data),
+            error: None,
+        },
+        Err(err) => ApiResponse {
+            data: None,
+            error: Some(err),
+        },
+    };
 
-    Json(json!(result))
+    Json(json!(response))
 }
