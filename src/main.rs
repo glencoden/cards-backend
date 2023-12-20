@@ -86,8 +86,12 @@ where
 // askama templates
 
 #[derive(Template)]
-#[template(path = "test.html")]
-struct TestTemplate;
+#[template(path = "home.html")]
+struct HomeTemplate;
+
+#[derive(Template)]
+#[template(path = "glen.html")]
+struct GlenTemplate;
 
 // global state
 
@@ -119,7 +123,8 @@ async fn main() -> Result<(), SqlxError> {
     let root_path = env::current_dir().unwrap();
 
     let app = Router::new()
-        .route("/", get(test))
+        .route("/", get(page_home))
+        .route("/glen", get(page_glen))
         .route(
             "/api/users",
             get(read_users).post(create_user).put(update_user),
@@ -143,8 +148,14 @@ async fn main() -> Result<(), SqlxError> {
 
 // website route handlers
 
-async fn test() -> impl IntoResponse {
-    let template = TestTemplate {};
+async fn page_home() -> impl IntoResponse {
+    let template = HomeTemplate {};
+
+    HtmlResponse(template)
+}
+
+async fn page_glen() -> impl IntoResponse {
+    let template = GlenTemplate {};
 
     HtmlResponse(template)
 }
