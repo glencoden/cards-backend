@@ -12,8 +12,8 @@ use serde_json::{json, Value};
 use sqlx::{
     postgres::PgPoolOptions, query_builder::QueryBuilder, Error as SqlxError, Pool, Postgres,
 };
-use std::sync::Arc;
-use std::{env, net::SocketAddr};
+use std::{env, net::SocketAddr, sync::Arc};
+use tower_http::services::ServeDir;
 
 // db model
 
@@ -116,6 +116,8 @@ async fn main() -> Result<(), SqlxError> {
 
     // sever
 
+    let root_path = env::current_dir().unwrap();
+
     let app = Router::new()
         .route("/", get(test))
         .route(
@@ -123,6 +125,10 @@ async fn main() -> Result<(), SqlxError> {
             get(read_users).post(create_user).put(update_user),
         )
         .route("/api/users/:user_id", get(read_user).delete(delete_user))
+        .nest_service(
+            "/assets",
+            ServeDir::new(format!("{}/assets", root_path.to_str().unwrap())),
+        )
         .with_state(app_state);
 
     let port = 3000_u16;
