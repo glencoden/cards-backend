@@ -27,3 +27,20 @@ CREATE TRIGGER update_cards_modtime
     ON cards
     FOR EACH ROW
     EXECUTE FUNCTION update_cards_modified_column();
+
+CREATE OR REPLACE FUNCTION update_prev_rating_column()
+RETURNS TRIGGER AS $$
+BEGIN
+   IF OLD.rating IS DISTINCT FROM NEW.rating THEN
+       NEW.prev_rating = OLD.rating;
+END IF;
+RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_cards_rating
+    BEFORE UPDATE
+    ON cards
+    FOR EACH ROW
+    WHEN (OLD.rating IS DISTINCT FROM NEW.rating)
+    EXECUTE FUNCTION update_prev_rating_column();
