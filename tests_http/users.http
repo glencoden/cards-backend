@@ -11,28 +11,20 @@ Accept: application/json
 ### create
 
 POST localhost:3000/api/users
-Content-Type: application/json
+Content-Type: application/x-www-form-urlencoded
 
-{
-    "name": "Glen",
-    "first": "Volker",
-    "last": "Project",
-    "email": "volker@project.com"
-}
+name = Volker &
+email = volker@project.com
 
 ### update
 
 PUT localhost:3000/api/users
-Content-Type: application/json
+Content-Type: application/x-www-form-urlencoded
 
-{
-    "id": 5,
-    "name": "Birgitt",
-    "first": "Glen",
-    "last": "Coden"
-}
+id = 2 &
+name = Birgit
 
 ### delete
 
-DELETE localhost:3000/api/users/5
+DELETE localhost:3000/api/users/2
 Content-Type: application/json

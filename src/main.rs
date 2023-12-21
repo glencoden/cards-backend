@@ -4,8 +4,9 @@ use axum::{
     http::StatusCode,
     response::{Html, IntoResponse, Json, Response},
     routing::get,
-    Router,
+    Form, Router,
 };
+use chrono::NaiveDateTime;
 use dotenvy::dotenv;
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -17,31 +18,27 @@ use tower_http::services::ServeDir;
 
 // db model
 
-// TODO: combine User structs and add Options > create http test flow
+// TODO: combine User structs and add Options >> create http test flow
 
 #[derive(serde::Serialize)]
 struct User {
     id: i32,
     name: String,
-    first: String,
-    last: String,
     email: String,
+    created_at: NaiveDateTime,
+    updated_at: NaiveDateTime,
 }
 
 #[derive(serde::Deserialize)]
-struct UserCreatePayload {
+struct UserPostForm {
     name: String,
-    first: String,
-    last: String,
     email: String,
 }
 
 #[derive(serde::Deserialize)]
-struct UserUpdatePayload {
+struct UserPutForm {
     id: i32,
     name: Option<String>,
-    first: Option<String>,
-    last: Option<String>,
     email: Option<String>,
 }
 
@@ -192,6 +189,8 @@ async fn get_users(State(app_state): State<Arc<AppState>>) -> Result<Json<Value>
     }
 }
 
+// END
+
 async fn read_user(
     State(app_state): State<Arc<AppState>>,
     Path(user_id): Path<i32>,
@@ -209,14 +208,12 @@ async fn read_user(
 
 async fn create_user(
     State(app_state): State<Arc<AppState>>,
-    Json(payload): Json<UserCreatePayload>,
+    Form(user_post_form): Form<UserPostForm>,
 ) -> Result<Json<Value>, StatusCode> {
     let result = sqlx::query!(
-        "INSERT INTO users (name, first, last, email) VALUES ($1, $2, $3, $4)",
-        payload.name,
-        payload.first,
-        payload.last,
-        payload.email,
+        "INSERT INTO users (name, email) VALUES ($1, $2)",
+        user_post_form.name,
+        user_post_form.email,
     )
     .execute(&app_state.pool)
     .await;
@@ -232,7 +229,7 @@ async fn create_user(
 
 async fn update_user(
     State(app_state): State<Arc<AppState>>,
-    Json(payload): Json<UserUpdatePayload>,
+    Form(user_put_form): Form<UserPutForm>,
 ) -> Result<Json<Value>, StatusCode> {
     let mut query = QueryBuilder::new("UPDATE users SET");
 
@@ -240,7 +237,7 @@ async fn update_user(
 
     // TODO: iterate over fields and extract as helper function
 
-    if let Some(name) = payload.name {
+    if let Some(name) = user_put_form.name {
         if num_updates > 0 {
             query.push(",");
         }
@@ -249,25 +246,7 @@ async fn update_user(
         num_updates += 1;
     }
 
-    if let Some(first) = payload.first {
-        if num_updates > 0 {
-            query.push(",");
-        }
-        query.push(" first =");
-        query.push_bind(first);
-        num_updates += 1;
-    }
-
-    if let Some(last) = payload.last {
-        if num_updates > 0 {
-            query.push(",");
-        }
-        query.push(" last =");
-        query.push_bind(last);
-        num_updates += 1;
-    }
-
-    if let Some(email) = payload.email {
+    if let Some(email) = user_put_form.email {
         if num_updates > 0 {
             query.push(",");
         }
@@ -281,7 +260,7 @@ async fn update_user(
     }
 
     query.push(" WHERE id =");
-    query.push_bind(payload.id);
+    query.push_bind(user_put_form.id);
 
     let result = query.build().execute(&app_state.pool).await;
 

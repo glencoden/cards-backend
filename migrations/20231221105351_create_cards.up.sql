@@ -1,16 +1,16 @@
 -- up.sql
 CREATE TABLE cards (
     id               SERIAL PRIMARY KEY,
-    deck_id          INTEGER REFERENCES decks (id),
-    related_card_ids INT[],
+    deck_id          INTEGER REFERENCES decks (id) NOT NULL,
+    related_card_ids INT[] NOT NULL,
     example_text     VARCHAR(255),
     audio_url        VARCHAR(255),
-    seen_at          TIMESTAMP WITHOUT TIME ZONE,
+    seen_at          TIMESTAMP WITHOUT TIME ZONE NOT NULL,
     seen_for         INTEGER,
-    rating           INTEGER,
-    prev_rating      INTEGER,
-    created_at       TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at       TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    rating           INTEGER NOT NULL,
+    prev_rating      INTEGER NOT NULL,
+    created_at       TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at       TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 CREATE OR REPLACE FUNCTION update_cards_modified_column()

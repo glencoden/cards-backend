@@ -1,12 +1,12 @@
 -- up.sql
 CREATE TABLE decks (
     id            SERIAL PRIMARY KEY,
-    user_id       INTEGER REFERENCES users (id),
-    from_language VARCHAR(100),
-    to_language   VARCHAR(100),
-    seen_at       TIMESTAMP WITHOUT TIME ZONE,
-    created_at    TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at    TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    user_id       INTEGER REFERENCES users (id) NOT NULL,
+    from_language VARCHAR(100) NOT NULL,
+    to_language   VARCHAR(100) NOT NULL,
+    seen_at       TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+    created_at    TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at    TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 CREATE OR REPLACE FUNCTION update_decks_modified_column()
