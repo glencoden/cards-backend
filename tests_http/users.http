@@ -13,17 +13,17 @@ Accept: application/json
 POST localhost:3000/api/users
 Content-Type: application/x-www-form-urlencoded
 
-name = Volker &
-email = volker@project.com
+name = glen &
+email = glen@coden.io
 
 ### update
 
-PUT localhost:3000/api/users/1
+PUT localhost:3000/api/users/2
 Content-Type: application/x-www-form-urlencoded
 
 email = simon@gmail.com
 
 ### delete
 
-DELETE localhost:3000/api/users/3
+DELETE localhost:3000/api/users/2
 Content-Type: application/json

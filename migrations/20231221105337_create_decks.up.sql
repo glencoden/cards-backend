@@ -5,9 +5,10 @@ CREATE TABLE decks (
     from_language         VARCHAR(100)                  NOT NULL,
     to_language_primary   VARCHAR(100)                  NOT NULL,
     to_language_secondary VARCHAR(100),
-    seen_at               TIMESTAMP WITHOUT TIME ZONE NOT NULL,
-    created_at            TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at            TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+    design_key            VARCHAR(100),
+    seen_at               TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at            TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at            TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE OR REPLACE FUNCTION update_decks_modified_column()

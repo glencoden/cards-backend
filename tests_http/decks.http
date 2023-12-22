@@ -13,17 +13,17 @@ Accept: application/json
 POST localhost:3000/api/decks
 Content-Type: application/x-www-form-urlencoded
 
-from_language = Erde &
-to_language_primary = Meyer
+from_language = Deutsch &
+to_language_primary = 한국어
 
 ### update
 
-PUT localhost:3000/api/decks/2
+PUT localhost:3000/api/decks/1
 Content-Type: application/x-www-form-urlencoded
 
-email = simon@gmail.com
+design_key = cosmic
 
 ### delete
 
-DELETE localhost:3000/api/decks/2
+DELETE localhost:3000/api/decks/4
 Content-Type: application/json

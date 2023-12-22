@@ -40,6 +40,7 @@ struct Deck {
     from_language: String,
     to_language_primary: String,
     to_language_secondary: Option<String>,
+    design_key: Option<String>,
     seen_at: NaiveDateTime,
     created_at: NaiveDateTime,
     updated_at: NaiveDateTime,
@@ -50,6 +51,7 @@ struct DeckForm {
     from_language: Option<String>,
     to_language_primary: Option<String>,
     to_language_secondary: Option<String>,
+    design_key: Option<String>,
     seen_at: Option<NaiveDateTime>,
 }
 
@@ -190,7 +192,11 @@ async fn main() -> Result<(), SqlxError> {
             "/decks/:deck_id",
             get(get_deck).put(put_deck).delete(delete_deck),
         )
-        .route("/cards/:deck_id", get(get_cards).post(post_card));
+        .route("/cards/:deck_id", get(get_cards).post(post_card))
+        .route(
+            "/cards/:deck_id/:card_id",
+            get(get_card).put(put_card).delete(delete_card),
+        );
 
     let app = Router::new()
         .nest("/api", api_router)
@@ -375,16 +381,56 @@ async fn get_cards(
     Ok(db_result_to_json_response(result))
 }
 
+async fn get_card(
+    State(app_state): State<Arc<AppState>>,
+    Path(ids): Path<(i32, i32)>,
+) -> Result<Json<Value>, StatusCode> {
+    if let None = app_state.user {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    let result = read_card_query(&app_state.pool, ids.0, ids.1).await;
+
+    Ok(db_result_to_json_response(result))
+}
+
 async fn post_card(
     State(app_state): State<Arc<AppState>>,
     Path(deck_id): Path<i32>,
-    Json(card_form): Json<CardForm>,
+    Form(card_form): Form<CardForm>,
 ) -> Result<Json<Value>, StatusCode> {
     if let None = app_state.user {
         return Err(StatusCode::UNAUTHORIZED);
     }
 
     let result = create_card_query(&app_state.pool, deck_id, card_form).await;
+
+    Ok(db_result_to_json_response(result))
+}
+
+async fn put_card(
+    State(app_state): State<Arc<AppState>>,
+    Path(ids): Path<(i32, i32)>,
+    Form(card_form): Form<CardForm>,
+) -> Result<Json<Value>, StatusCode> {
+    if let None = app_state.user {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    let result = update_card_query(&app_state.pool, ids.0, ids.1, card_form).await;
+
+    Ok(db_result_to_json_response(result))
+}
+
+async fn delete_card(
+    State(app_state): State<Arc<AppState>>,
+    Path(ids): Path<(i32, i32)>,
+) -> Result<Json<Value>, StatusCode> {
+    if let None = app_state.user {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    let result = delete_card_query(&app_state.pool, ids.0, ids.1).await;
 
     Ok(db_result_to_json_response(result))
 }
@@ -528,17 +574,13 @@ async fn create_deck_query(
         return Err(SqlxError::RowNotFound);
     }
 
-    if let None = deck_form.seen_at {
-        return Err(SqlxError::RowNotFound);
-    }
-
     let result = sqlx::query!(
-        "INSERT INTO decks (from_language, to_language_primary, to_language_secondary, seen_at, user_id) VALUES ($1, $2, $3, $4, $5)",
+        "INSERT INTO decks (user_id, from_language, to_language_primary, to_language_secondary, design_key) VALUES ($1, $2, $3, $4, $5)",
+        user_id,
         deck_form.from_language,
         deck_form.to_language_primary,
         deck_form.to_language_secondary,
-        deck_form.seen_at,
-        user_id,
+        deck_form.design_key,
     )
     .execute(pool)
     .await;
@@ -585,6 +627,15 @@ async fn update_deck_query(
         }
         query.push(" to_language_secondary =");
         query.push_bind(to_language_secondary);
+        num_updates += 1;
+    }
+
+    if let Some(design_key) = deck_form.design_key {
+        if num_updates > 0 {
+            query.push(",");
+        }
+        query.push(" design_key =");
+        query.push_bind(design_key);
         num_updates += 1;
     }
 
@@ -644,16 +695,26 @@ async fn read_cards_query(pool: &Pool<Postgres>, deck_id: i32) -> Result<Vec<Car
         .await
 }
 
+async fn read_card_query(
+    pool: &Pool<Postgres>,
+    deck_id: i32,
+    card_id: i32,
+) -> Result<Vec<Card>, SqlxError> {
+    sqlx::query_as!(
+        Card,
+        "SELECT * FROM cards WHERE id = $1 AND deck_id = $2",
+        card_id,
+        deck_id
+    )
+    .fetch_all(pool)
+    .await
+}
+
 async fn create_card_query(
     pool: &Pool<Postgres>,
     deck_id: i32,
     card_form: CardForm,
 ) -> Result<DatabaseQueryResult, SqlxError> {
-    // TODO: will this use the SQL default if I try to insert None?
-    // if let None = card_form.related_card_ids {
-    //     return Err(SqlxError::RowNotFound);
-    // }
-
     if let None = card_form.from_text {
         return Err(SqlxError::RowNotFound);
     }
@@ -670,6 +731,138 @@ async fn create_card_query(
         card_form.to_text_secondary,
         card_form.example_text,
         card_form.audio_url,
+    )
+    .execute(pool)
+    .await;
+
+    match result {
+        Ok(pg_query_result) => Ok(DatabaseQueryResult {
+            rows_affected: pg_query_result.rows_affected(),
+        }),
+        Err(err) => Err(err),
+    }
+}
+
+async fn update_card_query(
+    pool: &Pool<Postgres>,
+    deck_id: i32,
+    card_id: i32,
+    card_form: CardForm,
+) -> Result<DatabaseQueryResult, SqlxError> {
+    let mut query = QueryBuilder::new("UPDATE cards SET");
+
+    let mut num_updates = 0;
+
+    if let Some(related_card_ids) = card_form.related_card_ids {
+        if num_updates > 0 {
+            query.push(",");
+        }
+        query.push(" related_card_ids =");
+        query.push_bind(related_card_ids);
+        num_updates += 1;
+    }
+
+    if let Some(from_text) = card_form.from_text {
+        if num_updates > 0 {
+            query.push(",");
+        }
+        query.push(" from_text =");
+        query.push_bind(from_text);
+        num_updates += 1;
+    }
+
+    if let Some(to_text_primary) = card_form.to_text_primary {
+        if num_updates > 0 {
+            query.push(",");
+        }
+        query.push(" to_text_primary =");
+        query.push_bind(to_text_primary);
+        num_updates += 1;
+    }
+
+    if let Some(to_text_secondary) = card_form.to_text_secondary {
+        if num_updates > 0 {
+            query.push(",");
+        }
+        query.push(" to_text_secondary =");
+        query.push_bind(to_text_secondary);
+        num_updates += 1;
+    }
+
+    if let Some(example_text) = card_form.example_text {
+        if num_updates > 0 {
+            query.push(",");
+        }
+        query.push(" example_text =");
+        query.push_bind(example_text);
+        num_updates += 1;
+    }
+
+    if let Some(audio_url) = card_form.audio_url {
+        if num_updates > 0 {
+            query.push(",");
+        }
+        query.push(" audio_url =");
+        query.push_bind(audio_url);
+        num_updates += 1;
+    }
+
+    if let Some(seen_at) = card_form.seen_at {
+        if num_updates > 0 {
+            query.push(",");
+        }
+        query.push(" seen_at =");
+        query.push_bind(seen_at);
+        num_updates += 1;
+    }
+
+    if let Some(seen_for) = card_form.seen_for {
+        if num_updates > 0 {
+            query.push(",");
+        }
+        query.push(" seen_for =");
+        query.push_bind(seen_for);
+        num_updates += 1;
+    }
+
+    if let Some(rating) = card_form.rating {
+        if num_updates > 0 {
+            query.push(",");
+        }
+        query.push(" rating =");
+        query.push_bind(rating);
+        num_updates += 1;
+    }
+
+    if num_updates == 0 {
+        return Err(SqlxError::RowNotFound);
+    }
+
+    query.push(" WHERE id =");
+    query.push_bind(card_id);
+
+    query.push(" AND deck_id =");
+    query.push_bind(deck_id);
+
+    let result = query.build().execute(pool).await;
+
+    match result {
+        Ok(pg_query_result) => Ok(DatabaseQueryResult {
+            rows_affected: pg_query_result.rows_affected(),
+        }),
+        Err(err) => Err(err),
+    }
+}
+
+async fn delete_card_query(
+    pool: &Pool<Postgres>,
+    deck_id: i32,
+    card_id: i32,
+) -> Result<DatabaseQueryResult, SqlxError> {
+    let result = sqlx::query!(
+        "DELETE FROM cards WHERE id = $1 AND deck_id = $2",
+        card_id,
+        deck_id
     )
     .execute(pool)
     .await;
