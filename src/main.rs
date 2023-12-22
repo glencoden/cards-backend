@@ -144,6 +144,7 @@ struct ErrorTemplate {
 #[template(path = "action.html")]
 struct ActionTemplate {
     card: Card,
+    num_cards: i32,
     deck_id: i32,
     index: usize,
     side: String,
@@ -228,7 +229,7 @@ async fn main() -> Result<(), SqlxError> {
         .with_state(app_state);
 
     let port = 3000_u16;
-    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
 
@@ -272,6 +273,7 @@ async fn page_action(
         if let Some(card) = card {
             let template = ActionTemplate {
                 card,
+                num_cards: cards.len() as i32,
                 deck_id: params.0,
                 index: params.1,
                 side: params.2,
@@ -315,6 +317,7 @@ async fn page_action(
                 .and_hms_opt(9, 10, 11)
                 .unwrap(),
         },
+        num_cards: 0,
         deck_id: params.0,
         index: 0,
         side: String::from("from"),
