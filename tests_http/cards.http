@@ -1,29 +1,29 @@
 ### read all
 
-GET localhost:3000/api/decks
+GET localhost:3000/api/cards/1
 Accept: application/json
 
 ### read one
 
-GET localhost:3000/api/decks/1
+GET localhost:3000/api/cards/1/1
 Accept: application/json
 
 ### create
 
-POST localhost:3000/api/decks
+POST localhost:3000/api/cards/1
 Content-Type: application/x-www-form-urlencoded
 
-from_language = Erde &
-to_language_primary = Meyer
+from_text = Three &
+to_text_primary = Trois
 
 ### update
 
-PUT localhost:3000/api/decks/2
+PUT localhost:3000/api/cards/1/1
 Content-Type: application/x-www-form-urlencoded
 
 email = simon@gmail.com
 
 ### delete
 
-DELETE localhost:3000/api/decks/2
+DELETE localhost:3000/api/cards/1/1
 Content-Type: application/json

@@ -38,7 +38,8 @@ struct Deck {
     id: i32,
     user_id: i32,
     from_language: String,
-    to_language: String,
+    to_language_primary: String,
+    to_language_secondary: Option<String>,
     seen_at: NaiveDateTime,
     created_at: NaiveDateTime,
     updated_at: NaiveDateTime,
@@ -47,7 +48,8 @@ struct Deck {
 #[derive(serde::Deserialize)]
 struct DeckForm {
     from_language: Option<String>,
-    to_language: Option<String>,
+    to_language_primary: Option<String>,
+    to_language_secondary: Option<String>,
     seen_at: Option<NaiveDateTime>,
 }
 
@@ -56,8 +58,11 @@ struct Card {
     id: i32,
     deck_id: i32,
     related_card_ids: Vec<i32>,
-    example_text: String,
-    audio_url: String,
+    from_text: String,
+    to_text_primary: String,
+    to_text_secondary: Option<String>,
+    example_text: Option<String>,
+    audio_url: Option<String>,
     seen_at: NaiveDateTime,
     seen_for: Option<i32>,
     rating: i32,
@@ -69,6 +74,9 @@ struct Card {
 #[derive(serde::Deserialize)]
 struct CardForm {
     related_card_ids: Option<Vec<i32>>,
+    from_text: Option<String>,
+    to_text_primary: Option<String>,
+    to_text_secondary: Option<String>,
     example_text: Option<String>,
     audio_url: Option<String>,
     seen_at: Option<NaiveDateTime>,
@@ -157,7 +165,7 @@ async fn main() -> Result<(), SqlxError> {
         user: Some(User {
             id: 1i32,
             name: String::from("glencoden"),
-            email: String::from("simon.der.meyer@gmail.com"),
+            email: env::var("TEST_EMAIL").unwrap(),
             created_at: chrono::NaiveDate::from_ymd_opt(2016, 7, 8)
                 .unwrap()
                 .and_hms_opt(9, 10, 11)
@@ -181,7 +189,8 @@ async fn main() -> Result<(), SqlxError> {
         .route(
             "/decks/:deck_id",
             get(get_deck).put(put_deck).delete(delete_deck),
-        );
+        )
+        .route("/cards/:deck_id", get(get_cards).post(post_card));
 
     let app = Router::new()
         .nest("/api", api_router)
@@ -353,6 +362,33 @@ async fn delete_deck(
     Ok(db_result_to_json_response(result))
 }
 
+async fn get_cards(
+    State(app_state): State<Arc<AppState>>,
+    Path(deck_id): Path<i32>,
+) -> Result<Json<Value>, StatusCode> {
+    if let None = app_state.user {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    let result = read_cards_query(&app_state.pool, deck_id).await;
+
+    Ok(db_result_to_json_response(result))
+}
+
+async fn post_card(
+    State(app_state): State<Arc<AppState>>,
+    Path(deck_id): Path<i32>,
+    Json(card_form): Json<CardForm>,
+) -> Result<Json<Value>, StatusCode> {
+    if let None = app_state.user {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    let result = create_card_query(&app_state.pool, deck_id, card_form).await;
+
+    Ok(db_result_to_json_response(result))
+}
+
 // database queries
 
 async fn read_users_query(pool: &Pool<Postgres>) -> Result<Vec<User>, SqlxError> {
@@ -488,7 +524,7 @@ async fn create_deck_query(
         return Err(SqlxError::RowNotFound);
     }
 
-    if let None = deck_form.to_language {
+    if let None = deck_form.to_language_primary {
         return Err(SqlxError::RowNotFound);
     }
 
@@ -497,9 +533,10 @@ async fn create_deck_query(
     }
 
     let result = sqlx::query!(
-        "INSERT INTO decks (from_language, to_language, seen_at, user_id) VALUES ($1, $2, $3, $4)",
+        "INSERT INTO decks (from_language, to_language_primary, to_language_secondary, seen_at, user_id) VALUES ($1, $2, $3, $4, $5)",
         deck_form.from_language,
-        deck_form.to_language,
+        deck_form.to_language_primary,
+        deck_form.to_language_secondary,
         deck_form.seen_at,
         user_id,
     )
@@ -533,12 +570,21 @@ async fn update_deck_query(
         num_updates += 1;
     }
 
-    if let Some(to_language) = deck_form.to_language {
+    if let Some(to_language_primary) = deck_form.to_language_primary {
         if num_updates > 0 {
             query.push(",");
         }
-        query.push(" to_language =");
-        query.push_bind(to_language);
+        query.push(" to_language_primary =");
+        query.push_bind(to_language_primary);
+        num_updates += 1;
+    }
+
+    if let Some(to_language_secondary) = deck_form.to_language_secondary {
+        if num_updates > 0 {
+            query.push(",");
+        }
+        query.push(" to_language_secondary =");
+        query.push_bind(to_language_secondary);
         num_updates += 1;
     }
 
@@ -580,6 +626,50 @@ async fn delete_deck_query(
         "DELETE FROM decks WHERE id = $1 AND user_id = $2",
         deck_id,
         user_id
+    )
+    .execute(pool)
+    .await;
+
+    match result {
+        Ok(pg_query_result) => Ok(DatabaseQueryResult {
+            rows_affected: pg_query_result.rows_affected(),
+        }),
+        Err(err) => Err(err),
+    }
+}
+
+async fn read_cards_query(pool: &Pool<Postgres>, deck_id: i32) -> Result<Vec<Card>, SqlxError> {
+    sqlx::query_as!(Card, "SELECT * FROM cards WHERE deck_id = $1", deck_id)
+        .fetch_all(pool)
+        .await
+}
+
+async fn create_card_query(
+    pool: &Pool<Postgres>,
+    deck_id: i32,
+    card_form: CardForm,
+) -> Result<DatabaseQueryResult, SqlxError> {
+    // TODO: will this use the SQL default if I try to insert None?
+    // if let None = card_form.related_card_ids {
+    //     return Err(SqlxError::RowNotFound);
+    // }
+
+    if let None = card_form.from_text {
+        return Err(SqlxError::RowNotFound);
+    }
+
+    if let None = card_form.to_text_primary {
+        return Err(SqlxError::RowNotFound);
+    }
+
+    let result = sqlx::query!(
+        "INSERT INTO cards (deck_id, from_text, to_text_primary, to_text_secondary, example_text, audio_url) VALUES ($1, $2, $3, $4, $5, $6)",
+        deck_id,
+        card_form.from_text,
+        card_form.to_text_primary,
+        card_form.to_text_secondary,
+        card_form.example_text,
+        card_form.audio_url,
     )
     .execute(pool)
     .await;
