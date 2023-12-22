@@ -1,0 +1,40 @@
+{% extends "index.html" %}
+
+{% block main %}
+
+<a href="/">
+    {% set label = "zurück" %}
+    {% include "button.html" %}
+</a>
+
+<div class="flex flex-col my-10">
+    {% set text = side %}
+    {% include "heading.html" %}
+
+    {% if side == "from" %}
+    <a href="/action/{{ deck_id }}/{{ index }}/to">
+        {% set text = card.from_text %}
+        {% include "card.html" %}
+    </a>
+    {% else if side == "to" %}
+    <a href="/action/{{ deck_id }}/{{ index }}/from">
+        {% set text = card.to_text_primary %}
+        {% include "card.html" %}
+    </a>
+    {% endif %}
+</div>
+
+<div class="flex gap-4">
+    <a href="/add_card/{{ deck_id }}/{{ index }}">
+        {% set label = "neu" %}
+        {% include "button.html" %}
+    </a>
+
+    {% set next_index = index + 1 %}
+    <a href="/action/{{ deck_id }}/{{ next_index }}/from">
+        {% set label = "nächste" %}
+        {% include "button.html" %}
+    </a>
+</div>
+
+{% endblock %}

@@ -55,7 +55,7 @@ struct DeckForm {
     seen_at: Option<NaiveDateTime>,
 }
 
-#[derive(serde::Serialize)]
+#[derive(Clone, serde::Serialize)]
 struct Card {
     id: i32,
     deck_id: i32,
@@ -130,12 +130,30 @@ where
 
 #[derive(Template)]
 #[template(path = "home.html")]
-struct HomeTemplate;
+struct HomeTemplate {
+    decks: Vec<Deck>,
+}
 
 #[derive(Template)]
-#[template(path = "users.html")]
-struct UsersTemplate {
-    users: Vec<User>,
+#[template(path = "error.html")]
+struct ErrorTemplate {
+    message: String,
+}
+
+#[derive(Template)]
+#[template(path = "action.html")]
+struct ActionTemplate {
+    card: Card,
+    deck_id: i32,
+    index: usize,
+    side: String,
+}
+
+#[derive(Template)]
+#[template(path = "add_card.html")]
+struct AddCardTemplate {
+    deck_id: i32,
+    card_index: i32,
 }
 
 // global state
@@ -201,7 +219,8 @@ async fn main() -> Result<(), SqlxError> {
     let app = Router::new()
         .nest("/api", api_router)
         .route("/", get(page_home))
-        .route("/users", get(users_page))
+        .route("/action/:deck_id/:card_index/:card_side", get(page_action))
+        .route("/add_card/:deck_id/:card_index", get(page_add_card))
         .nest_service(
             "/assets",
             ServeDir::new(format!("{}/assets", root_path.to_str().unwrap())),
@@ -220,26 +239,97 @@ async fn main() -> Result<(), SqlxError> {
 
 // website route handlers
 
-async fn page_home() -> impl IntoResponse {
-    let template = HomeTemplate {};
+async fn page_home(State(app_state): State<Arc<AppState>>) -> impl IntoResponse {
+    // TODO: add error template
+    if let None = app_state.user {
+        let template = HomeTemplate { decks: Vec::new() };
+
+        return HtmlResponse(template);
+    }
+
+    let result = read_decks_query(&app_state.pool, app_state.user.as_ref().unwrap().id).await;
+
+    if let Ok(decks) = result {
+        let template = HomeTemplate { decks };
+
+        HtmlResponse(template)
+    } else {
+        let template = HomeTemplate { decks: Vec::new() };
+
+        HtmlResponse(template)
+    }
+}
+
+async fn page_action(
+    State(app_state): State<Arc<AppState>>,
+    Path(params): Path<(i32, usize, String)>,
+) -> impl IntoResponse {
+    let result = read_cards_query(&app_state.pool, params.0).await;
+
+    if let Ok(cards) = result {
+        let card = cards.get(params.1).cloned();
+
+        if let Some(card) = card {
+            let template = ActionTemplate {
+                card,
+                deck_id: params.0,
+                index: params.1,
+                side: params.2,
+            };
+
+            return HtmlResponse(template);
+        }
+    }
+
+    // TODO: add error template
+
+    // let template = ErrorTemplate {
+    //     message: String::from("No cards found for action"),
+    // };
+    //
+    // HtmlResponse(template)
+
+    let template = ActionTemplate {
+        card: Card {
+            id: 0,
+            deck_id: 0,
+            related_card_ids: Vec::new(),
+            from_text: String::from("The End"),
+            to_text_primary: String::from("The End"),
+            to_text_secondary: None,
+            example_text: None,
+            audio_url: None,
+            seen_at: chrono::NaiveDate::from_ymd_opt(2016, 7, 8)
+                .unwrap()
+                .and_hms_opt(9, 10, 11)
+                .unwrap(),
+            seen_for: None,
+            rating: 0,
+            prev_rating: 0,
+            created_at: chrono::NaiveDate::from_ymd_opt(2016, 7, 8)
+                .unwrap()
+                .and_hms_opt(9, 10, 11)
+                .unwrap(),
+            updated_at: chrono::NaiveDate::from_ymd_opt(2016, 7, 8)
+                .unwrap()
+                .and_hms_opt(9, 10, 11)
+                .unwrap(),
+        },
+        deck_id: params.0,
+        index: 0,
+        side: String::from("from"),
+    };
 
     HtmlResponse(template)
 }
 
-async fn users_page(State(app_state): State<Arc<AppState>>) -> impl IntoResponse {
-    let result = read_users_query(&app_state.pool).await;
+async fn page_add_card(Path(params): Path<(i32, i32)>) -> impl IntoResponse {
+    let template = AddCardTemplate {
+        deck_id: params.0,
+        card_index: params.1,
+    };
 
-    if let Ok(users) = result {
-        let template = UsersTemplate { users };
-
-        HtmlResponse(template)
-    } else {
-        // TODO: add error template
-
-        let template = UsersTemplate { users: Vec::new() };
-
-        HtmlResponse(template)
-    }
+    HtmlResponse(template)
 }
 
 // api route handlers

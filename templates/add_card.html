@@ -1,0 +1,55 @@
+{% extends "index.html" %}
+
+{% block main %}
+
+<a href="/action/{{ deck_id }}/{{ card_index }}/from">
+    {% set label = "zurück" %}
+    {% include "button.html" %}
+</a>
+
+{% set text = "Neue Karte" %}
+{% include "heading.html" %}
+
+<form
+    hx-post="/api/cards/{{ deck_id }}"
+    hx-target="#response"
+    class="max-w-md flex flex-col gap-4"
+>
+    <div class="flex flex-col">
+        <label for="from" class="block text-sm font-medium leading-6 text-gray-900">
+            from
+        </label>
+        <input
+            type="text"
+            name="from_text"
+            id="from"
+            class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+            placeholder="from"
+        />
+    </div>
+
+    <div class="flex flex-col">
+        <label for="to" class="block text-sm font-medium leading-6 text-gray-900">
+            to
+        </label>
+        <input
+            type="text"
+            name="to_text_primary"
+            id="to"
+            class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+            placeholder="to"
+        />
+    </div>
+
+    <button
+        type="submit"
+        class="my-10"
+    >
+        {% set label = "erstellen" %}
+        {% include "button.html" %}
+    </button>
+</form>
+
+<div id="response"></div>
+
+{% endblock %}
