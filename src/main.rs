@@ -8,6 +8,7 @@ use axum::{
 };
 use chrono::NaiveDateTime;
 use dotenvy::dotenv;
+use rand::Rng;
 use serde::Serialize;
 use serde_json::{json, Value};
 use sqlx::{
@@ -148,6 +149,7 @@ struct ActionTemplate {
     deck_id: i32,
     index: usize,
     side: String,
+    random: String,
 }
 
 #[derive(Template)]
@@ -267,8 +269,17 @@ async fn page_action(
 ) -> impl IntoResponse {
     let result = read_cards_query(&app_state.pool, params.0).await;
 
-    if let Ok(cards) = result {
+    if let Ok(mut cards) = result {
+        cards.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+
         let card = cards.get(params.1).cloned();
+        let random_number = rand::thread_rng().gen_range(0..=2);
+
+        let random = if random_number > 0 {
+            String::from("from")
+        } else {
+            String::from("to")
+        };
 
         if let Some(card) = card {
             let template = ActionTemplate {
@@ -277,6 +288,7 @@ async fn page_action(
                 deck_id: params.0,
                 index: params.1,
                 side: params.2,
+                random,
             };
 
             return HtmlResponse(template);
@@ -321,6 +333,7 @@ async fn page_action(
         deck_id: params.0,
         index: 0,
         side: String::from("from"),
+        random: String::from("from"),
     };
 
     HtmlResponse(template)

@@ -34,7 +34,7 @@
     </a>
 
     {% set next_index = index + 1 %}
-    <a href="/action/{{ deck_id }}/{{ next_index }}/from">
+    <a href="/action/{{ deck_id }}/{{ next_index }}/{{ random }}">
         {% set label = "nächste" %}
         {% include "button.html" %}
     </a>
