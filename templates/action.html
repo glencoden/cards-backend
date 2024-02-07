@@ -14,17 +14,7 @@
         </p>
     {% endif %}
 
-    {% if side == "from" %}
-        <a href="/action/{{ deck_id }}/{{ index }}/to">
-            {% set text = card.from_text %}
-            {% include "card.html" %}
-        </a>
-    {% else if side == "to" %}
-        <a href="/action/{{ deck_id }}/{{ index }}/from">
-            {% set text = card.to_text_primary %}
-            {% include "card.html" %}
-        </a>
-    {% endif %}
+    {% include "card.html" %}
 </div>
 
 <div class="flex gap-4">

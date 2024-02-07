@@ -1,3 +1,21 @@
-<p class="text-center rounded-md bg-yellow-50 py-28 my-2 font-semibold text-xl text-purple-700 shadow-sm hover:bg-yellow-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-50">
-    {{ text }}
+<p
+    id="card_{{ card.id }}"
+    class="text-center rounded-md bg-yellow-50 py-28 my-2 font-semibold text-xl text-purple-700 shadow-sm hover:bg-yellow-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-50"
+    onclick="
+        const cardElement = document.getElementById('card_{{ card.id }}');
+
+        if (cardElement.innerText === '{{ card.from_text }}') {
+            cardElement.innerText = '{{ card.to_text_primary }}';
+            history.pushState(null, '', '/action/{{ deck_id }}/{{ index }}/to');
+        } else {
+            cardElement.innerText = '{{ card.from_text }}';
+            history.pushState(null, '', '/action/{{ deck_id }}/{{ index }}/from');
+        }
+    "
+>
+    {% if side == "from" %}
+        {{ card.from_text }}
+    {% else if side == "to" %}
+        {{ card.to_text_primary }}
+    {% endif %}
 </p>
