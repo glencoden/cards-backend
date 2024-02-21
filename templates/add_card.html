@@ -11,8 +11,8 @@
 {% include "heading.html" %}
 
 <form
-    hx-post="/api/cards/{{ deck_id }}"
-    hx-target="#response"
+    hx-post="/api/cards/{{ deck_id }}?uuid={{ uuid }}"
+    hx-on::after-request="location.href = '/action/{{ deck_id }}/{{ card_index }}/from';"
     class="flex flex-col gap-4"
 >
     <div class="flex flex-col">
@@ -49,7 +49,5 @@
         {% include "button.html" %}
     </button>
 </form>
-
-<div id="response"></div>
 
 {% endblock %}

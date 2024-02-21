@@ -1,6 +1,6 @@
 use askama::Template;
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::{Html, IntoResponse, Json, Response},
     routing::get,
@@ -14,7 +14,7 @@ use serde_json::{json, Value};
 use sqlx::{
     postgres::PgPoolOptions, query_builder::QueryBuilder, Error as SqlxError, Pool, Postgres,
 };
-use std::{env, net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, env, net::SocketAddr, sync::Arc};
 use tower_http::services::ServeDir;
 
 // db model
@@ -150,6 +150,7 @@ struct ActionTemplate {
     index: usize,
     side: String,
     random: String,
+    uuid: String,
 }
 
 #[derive(Template)]
@@ -157,6 +158,7 @@ struct ActionTemplate {
 struct AddCardTemplate {
     deck_id: i32,
     card_index: i32,
+    uuid: String,
 }
 
 // global state
@@ -164,6 +166,7 @@ struct AddCardTemplate {
 struct AppState {
     pool: Pool<Postgres>,
     user: Option<User>,
+    uuid: String,
 }
 
 // main
@@ -183,6 +186,8 @@ async fn main() -> Result<(), SqlxError> {
 
     // sever
 
+    let uuid = env::var("UUID").unwrap();
+
     let app_state = Arc::new(AppState {
         pool,
         user: Some(User {
@@ -198,6 +203,7 @@ async fn main() -> Result<(), SqlxError> {
                 .and_hms_opt(9, 10, 11)
                 .unwrap(),
         }),
+        uuid,
     });
 
     let root_path = env::current_dir().unwrap();
@@ -242,9 +248,13 @@ async fn main() -> Result<(), SqlxError> {
 
 // website route handlers
 
-async fn page_home(State(app_state): State<Arc<AppState>>) -> impl IntoResponse {
+async fn page_home(
+    State(app_state): State<Arc<AppState>>,
+    Query(query): Query<HashMap<String, String>>,
+) -> impl IntoResponse {
+    let uuid = query.get("uuid");
     // TODO: add error template
-    if let None = app_state.user {
+    if app_state.user.is_none() || uuid.is_none() || uuid.unwrap() != &app_state.uuid {
         let template = HomeTemplate { decks: Vec::new() };
 
         return HtmlResponse(template);
@@ -289,6 +299,7 @@ async fn page_action(
                 index: params.1,
                 side: params.2,
                 random,
+                uuid: app_state.uuid.clone(),
             };
 
             return HtmlResponse(template);
@@ -334,15 +345,20 @@ async fn page_action(
         index: 0,
         side: String::from("from"),
         random: String::from("from"),
+        uuid: app_state.uuid.clone(),
     };
 
     HtmlResponse(template)
 }
 
-async fn page_add_card(Path(params): Path<(i32, i32)>) -> impl IntoResponse {
+async fn page_add_card(
+    State(app_state): State<Arc<AppState>>,
+    Path(params): Path<(i32, i32)>,
+) -> impl IntoResponse {
     let template = AddCardTemplate {
         deck_id: params.0,
         card_index: params.1,
+        uuid: app_state.uuid.clone(),
     };
 
     HtmlResponse(template)
@@ -390,8 +406,12 @@ async fn delete_user(
     db_result_to_json_response(result)
 }
 
-async fn get_decks(State(app_state): State<Arc<AppState>>) -> Result<Json<Value>, StatusCode> {
-    if let None = app_state.user {
+async fn get_decks(
+    State(app_state): State<Arc<AppState>>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Result<Json<Value>, StatusCode> {
+    let uuid = query.get("uuid");
+    if app_state.user.is_none() || uuid.is_none() || uuid.unwrap() != &app_state.uuid {
         return Err(StatusCode::UNAUTHORIZED);
     }
 
@@ -403,8 +423,10 @@ async fn get_decks(State(app_state): State<Arc<AppState>>) -> Result<Json<Value>
 async fn get_deck(
     State(app_state): State<Arc<AppState>>,
     Path(deck_id): Path<i32>,
+    Query(query): Query<HashMap<String, String>>,
 ) -> Result<Json<Value>, StatusCode> {
-    if let None = app_state.user {
+    let uuid = query.get("uuid");
+    if app_state.user.is_none() || uuid.is_none() || uuid.unwrap() != &app_state.uuid {
         return Err(StatusCode::UNAUTHORIZED);
     }
 
@@ -420,9 +442,11 @@ async fn get_deck(
 
 async fn post_deck(
     State(app_state): State<Arc<AppState>>,
+    Query(query): Query<HashMap<String, String>>,
     Form(deck_form): Form<DeckForm>,
 ) -> Result<Json<Value>, StatusCode> {
-    if let None = app_state.user {
+    let uuid = query.get("uuid");
+    if app_state.user.is_none() || uuid.is_none() || uuid.unwrap() != &app_state.uuid {
         return Err(StatusCode::UNAUTHORIZED);
     }
 
@@ -439,9 +463,11 @@ async fn post_deck(
 async fn put_deck(
     State(app_state): State<Arc<AppState>>,
     Path(deck_id): Path<i32>,
+    Query(query): Query<HashMap<String, String>>,
     Form(deck_form): Form<DeckForm>,
 ) -> Result<Json<Value>, StatusCode> {
-    if let None = app_state.user {
+    let uuid = query.get("uuid");
+    if app_state.user.is_none() || uuid.is_none() || uuid.unwrap() != &app_state.uuid {
         return Err(StatusCode::UNAUTHORIZED);
     }
 
@@ -459,8 +485,10 @@ async fn put_deck(
 async fn delete_deck(
     State(app_state): State<Arc<AppState>>,
     Path(deck_id): Path<i32>,
+    Query(query): Query<HashMap<String, String>>,
 ) -> Result<Json<Value>, StatusCode> {
-    if let None = app_state.user {
+    let uuid = query.get("uuid");
+    if app_state.user.is_none() || uuid.is_none() || uuid.unwrap() != &app_state.uuid {
         return Err(StatusCode::UNAUTHORIZED);
     }
 
@@ -477,8 +505,10 @@ async fn delete_deck(
 async fn get_cards(
     State(app_state): State<Arc<AppState>>,
     Path(deck_id): Path<i32>,
+    Query(query): Query<HashMap<String, String>>,
 ) -> Result<Json<Value>, StatusCode> {
-    if let None = app_state.user {
+    let uuid = query.get("uuid");
+    if app_state.user.is_none() || uuid.is_none() || uuid.unwrap() != &app_state.uuid {
         return Err(StatusCode::UNAUTHORIZED);
     }
 
@@ -490,8 +520,10 @@ async fn get_cards(
 async fn get_card(
     State(app_state): State<Arc<AppState>>,
     Path(ids): Path<(i32, i32)>,
+    Query(query): Query<HashMap<String, String>>,
 ) -> Result<Json<Value>, StatusCode> {
-    if let None = app_state.user {
+    let uuid = query.get("uuid");
+    if app_state.user.is_none() || uuid.is_none() || uuid.unwrap() != &app_state.uuid {
         return Err(StatusCode::UNAUTHORIZED);
     }
 
@@ -503,9 +535,11 @@ async fn get_card(
 async fn post_card(
     State(app_state): State<Arc<AppState>>,
     Path(deck_id): Path<i32>,
+    Query(query): Query<HashMap<String, String>>,
     Form(card_form): Form<CardForm>,
 ) -> Result<Json<Value>, StatusCode> {
-    if let None = app_state.user {
+    let uuid = query.get("uuid");
+    if app_state.user.is_none() || uuid.is_none() || uuid.unwrap() != &app_state.uuid {
         return Err(StatusCode::UNAUTHORIZED);
     }
 
@@ -517,9 +551,11 @@ async fn post_card(
 async fn put_card(
     State(app_state): State<Arc<AppState>>,
     Path(ids): Path<(i32, i32)>,
+    Query(query): Query<HashMap<String, String>>,
     Form(card_form): Form<CardForm>,
 ) -> Result<Json<Value>, StatusCode> {
-    if let None = app_state.user {
+    let uuid = query.get("uuid");
+    if app_state.user.is_none() || uuid.is_none() || uuid.unwrap() != &app_state.uuid {
         return Err(StatusCode::UNAUTHORIZED);
     }
 
@@ -531,8 +567,10 @@ async fn put_card(
 async fn delete_card(
     State(app_state): State<Arc<AppState>>,
     Path(ids): Path<(i32, i32)>,
+    Query(query): Query<HashMap<String, String>>,
 ) -> Result<Json<Value>, StatusCode> {
-    if let None = app_state.user {
+    let uuid = query.get("uuid");
+    if app_state.user.is_none() || uuid.is_none() || uuid.unwrap() != &app_state.uuid {
         return Err(StatusCode::UNAUTHORIZED);
     }
 

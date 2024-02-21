@@ -2,12 +2,26 @@
 
 {% block main %}
 
-<a href="/">
-    {% set label = "zurück" %}
-    {% include "button.html" %}
-</a>
+<div class="flex justify-between">
+    <a href="/?uuid={{ uuid }}">
+        {% set label = "zurück" %}
+        {% include "button.html" %}
+    </a>
 
-<div class="flex flex-col my-10">
+    <div class="flex gap-4">
+        <a href="/add_card/{{ deck_id }}/{{ index }}">
+            {% set label = "edit" %}
+            {% include "button.html" %}
+        </a>
+
+        <a href="/add_card/{{ deck_id }}/{{ index }}">
+            {% set label = "neu" %}
+            {% include "button.html" %}
+        </a>
+    </div>
+</div>
+
+<div class="flex flex-col my-12">
     {% if num_cards > 0 %}
         <p class="text-xl font-sans text-purple-800">
             {{ index + 1 }} / {{ num_cards }}
@@ -17,16 +31,37 @@
     {% include "card.html" %}
 </div>
 
-<div class="flex gap-4">
-    <a href="/add_card/{{ deck_id }}/{{ index }}">
-        {% set label = "neu" %}
-        {% include "button.html" %}
-    </a>
-
+<div class="flex justify-between">
     {% set next_index = index + 1 %}
     <a href="/action/{{ deck_id }}/{{ next_index }}/{{ random }}">
-        {% set label = "nächste" %}
-        {% include "button.html" %}
+        <span class="rounded-md shadow-sm bg-blue-400 px-4 py-3"></span>
+    </a>
+    <a href="/action/{{ deck_id }}/{{ next_index }}/{{ random }}">
+        <span class="rounded-md shadow-sm bg-blue-500 px-4 py-3"></span>
+    </a>
+    <a href="/action/{{ deck_id }}/{{ next_index }}/{{ random }}">
+        <span class="rounded-md shadow-sm bg-teal-600 px-4 py-3"></span>
+    </a>
+    <a href="/action/{{ deck_id }}/{{ next_index }}/{{ random }}">
+        <span class="rounded-md shadow-sm bg-green-600 px-4 py-3"></span>
+    </a>
+    <a href="/action/{{ deck_id }}/{{ next_index }}/{{ random }}">
+        <span class="rounded-md shadow-sm bg-lime-500 px-4 py-3"></span>
+    </a>
+    <a href="/action/{{ deck_id }}/{{ next_index }}/{{ random }}">
+        <span class="rounded-md shadow-sm bg-yellow-300 px-4 py-3"></span>
+    </a>
+    <a href="/action/{{ deck_id }}/{{ next_index }}/{{ random }}">
+        <span class="rounded-md shadow-sm bg-yellow-500 px-4 py-3"></span>
+    </a>
+    <a href="/action/{{ deck_id }}/{{ next_index }}/{{ random }}">
+        <span class="rounded-md shadow-sm bg-orange-500 px-4 py-3"></span>
+    </a>
+    <a href="/action/{{ deck_id }}/{{ next_index }}/{{ random }}">
+        <span class="rounded-md shadow-sm bg-orange-600 px-4 py-3"></span>
+    </a>
+    <a href="/action/{{ deck_id }}/{{ next_index }}/{{ random }}">
+        <span class="rounded-md shadow-sm bg-red-700 px-4 py-3"></span>
     </a>
 </div>
 
