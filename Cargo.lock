@@ -269,7 +269,6 @@ dependencies = [
  "askama",
  "axum",
  "chrono",
- "dotenvy",
  "rand",
  "serde",
  "serde_json",

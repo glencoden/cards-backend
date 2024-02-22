@@ -7,7 +7,6 @@ use axum::{
     Form, Router,
 };
 use chrono::NaiveDateTime;
-use dotenvy::dotenv;
 use rand::Rng;
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -173,11 +172,12 @@ struct AppState {
 
 #[tokio::main]
 async fn main() -> Result<(), SqlxError> {
-    dotenv().unwrap();
+    // env
+
+    let db_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let uuid = env::var("UUID").expect("UUID must be set");
 
     // db
-
-    let db_url = env::var("DATABASE_URL").unwrap();
 
     let pool = PgPoolOptions::new()
         .max_connections(5)
@@ -186,14 +186,12 @@ async fn main() -> Result<(), SqlxError> {
 
     // sever
 
-    let uuid = env::var("UUID").unwrap();
-
     let app_state = Arc::new(AppState {
         pool,
         user: Some(User {
             id: 1i32,
             name: String::from("glencoden"),
-            email: env::var("TEST_EMAIL").unwrap(),
+            email: String::from("glen@coden.io"),
             created_at: chrono::NaiveDate::from_ymd_opt(2016, 7, 8)
                 .unwrap()
                 .and_hms_opt(9, 10, 11)
