@@ -364,32 +364,61 @@ async fn page_add_card(
 
 // api route handlers
 
-async fn get_users(State(app_state): State<Arc<AppState>>) -> Json<Value> {
+async fn get_users(
+    State(app_state): State<Arc<AppState>>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Result<Json<Value>, StatusCode> {
+    let uuid = query.get("uuid");
+    if app_state.user.is_none() || uuid.is_none() || uuid.unwrap() != &app_state.uuid {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
     let result = read_users_query(&app_state.pool).await;
 
-    db_result_to_json_response(result)
+    Ok(db_result_to_json_response(result))
 }
 
-async fn get_user(State(app_state): State<Arc<AppState>>, Path(user_id): Path<i32>) -> Json<Value> {
+async fn get_user(
+    State(app_state): State<Arc<AppState>>,
+    Path(user_id): Path<i32>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Result<Json<Value>, StatusCode> {
+    let uuid = query.get("uuid");
+    if app_state.user.is_none() || uuid.is_none() || uuid.unwrap() != &app_state.uuid {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
     let result = read_user(&app_state.pool, user_id).await;
 
-    db_result_to_json_response(result)
+    Ok(db_result_to_json_response(result))
 }
 
 async fn post_user(
     State(app_state): State<Arc<AppState>>,
+    Query(query): Query<HashMap<String, String>>,
     Form(user_form): Form<UserForm>,
-) -> Json<Value> {
+) -> Result<Json<Value>, StatusCode> {
+    let uuid = query.get("uuid");
+    if app_state.user.is_none() || uuid.is_none() || uuid.unwrap() != &app_state.uuid {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
     let result = create_user_query(&app_state.pool, user_form).await;
 
-    db_result_to_json_response(result)
+    Ok(db_result_to_json_response(result))
 }
 
 async fn put_user(
     State(app_state): State<Arc<AppState>>,
     Path(user_id): Path<i32>,
+    Query(query): Query<HashMap<String, String>>,
     Form(user_form): Form<UserForm>,
 ) -> Result<Json<Value>, StatusCode> {
+    let uuid = query.get("uuid");
+    if app_state.user.is_none() || uuid.is_none() || uuid.unwrap() != &app_state.uuid {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
     let result = update_user_query(&app_state.pool, user_id, user_form).await;
 
     Ok(db_result_to_json_response(result))
@@ -398,10 +427,16 @@ async fn put_user(
 async fn delete_user(
     State(app_state): State<Arc<AppState>>,
     Path(user_id): Path<i32>,
-) -> Json<Value> {
+    Query(query): Query<HashMap<String, String>>,
+) -> Result<Json<Value>, StatusCode> {
+    let uuid = query.get("uuid");
+    if app_state.user.is_none() || uuid.is_none() || uuid.unwrap() != &app_state.uuid {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
     let result = delete_user_query(&app_state.pool, user_id).await;
 
-    db_result_to_json_response(result)
+    Ok(db_result_to_json_response(result))
 }
 
 async fn get_decks(

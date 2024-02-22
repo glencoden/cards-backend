@@ -10,8 +10,9 @@
 
     <li class="py-4">
         <a href="/action/{{ deck.id }}/0/from">
-            {% set label = deck.to_language_primary %}
-            {% include "button.html" %}
+            <span class="rounded-md bg-purple-700 px-5 py-3 text-sm font-semibold text-yellow-50 shadow-sm hover:bg-purple-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-50">
+                {{ deck.from_language }} - {{ deck.to_language_primary }}
+            </span>
         </a>
     </li>
 
