@@ -9,7 +9,7 @@
     </a>
 
     <div class="flex gap-4">
-        <a href="/add_card/{{ deck_id }}/{{ index }}">
+        <a href="/edit_card/{{ deck_id }}/{{ card.id }}/{{ index }}?uuid={{ uuid }}">
             {% set label = "edit" %}
             {% include "button.html" %}
         </a>

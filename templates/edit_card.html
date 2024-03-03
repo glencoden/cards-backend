@@ -1,0 +1,55 @@
+{% extends "index.html" %}
+
+{% block main %}
+
+<a href="/action/{{ deck_id }}/{{ card_index }}/from">
+    {% set label = "zurück" %}
+    {% include "button.html" %}
+</a>
+
+{% set text = "Karte bearbeiten" %}
+{% include "heading.html" %}
+
+<form
+    hx-put="/api/cards/{{ deck_id }}/{{ card.id }}?uuid={{ uuid }}"
+    hx-on::after-request="location.href = '/action/{{ deck_id }}/{{ card_index }}/from';"
+    class="flex flex-col gap-4"
+>
+    <div class="flex flex-col">
+        <label for="from" class="block text-sm font-medium leading-6 text-gray-900">
+            from
+        </label>
+        <input
+            type="text"
+            name="from_text"
+            id="from"
+            class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+            placeholder="from"
+            value="{{ card.from_text }}"
+        />
+    </div>
+
+    <div class="flex flex-col">
+        <label for="to" class="block text-sm font-medium leading-6 text-gray-900">
+            to
+        </label>
+        <input
+            type="text"
+            name="to_text_primary"
+            id="to"
+            class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+            placeholder="to"
+            value="{{ card.to_text_primary }}"
+        />
+    </div>
+
+    <button
+        type="submit"
+        class="my-10"
+    >
+        {% set label = "fertig" %}
+        {% include "button.html" %}
+    </button>
+</form>
+
+{% endblock %}

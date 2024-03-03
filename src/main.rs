@@ -160,6 +160,15 @@ struct AddCardTemplate {
     uuid: String,
 }
 
+#[derive(Template)]
+#[template(path = "edit_card.html")]
+struct EditCardTemplate {
+    deck_id: i32,
+    card_index: i32,
+    card: Card,
+    uuid: String,
+}
+
 // global state
 
 struct AppState {
@@ -228,6 +237,10 @@ async fn main() -> Result<(), SqlxError> {
         .route("/", get(page_home))
         .route("/action/:deck_id/:card_index/:card_side", get(page_action))
         .route("/add_card/:deck_id/:card_index", get(page_add_card))
+        .route(
+            "/edit_card/:deck_id/:card_id/:card_index",
+            get(page_edit_card),
+        )
         .nest_service(
             "/assets",
             ServeDir::new(format!("{}/assets", root_path.to_str().unwrap())),
@@ -360,6 +373,94 @@ async fn page_add_card(
     };
 
     HtmlResponse(template)
+}
+
+async fn page_edit_card(
+    State(app_state): State<Arc<AppState>>,
+    Path(params): Path<(i32, i32, i32)>,
+    Query(query): Query<HashMap<String, String>>,
+) -> impl IntoResponse {
+    let uuid = query.get("uuid");
+    if app_state.user.is_none() || uuid.is_none() || uuid.unwrap() != &app_state.uuid {
+        let template = EditCardTemplate {
+            deck_id: params.0,
+            card_index: params.2,
+            card: Card {
+                id: 0,
+                deck_id: 0,
+                related_card_ids: Vec::new(),
+                from_text: String::from("Not found"),
+                to_text_primary: String::from("Not found"),
+                to_text_secondary: None,
+                example_text: None,
+                audio_url: None,
+                seen_at: chrono::NaiveDate::from_ymd_opt(2016, 7, 8)
+                    .unwrap()
+                    .and_hms_opt(9, 10, 11)
+                    .unwrap(),
+                seen_for: None,
+                rating: 0,
+                prev_rating: 0,
+                created_at: chrono::NaiveDate::from_ymd_opt(2016, 7, 8)
+                    .unwrap()
+                    .and_hms_opt(9, 10, 11)
+                    .unwrap(),
+                updated_at: chrono::NaiveDate::from_ymd_opt(2016, 7, 8)
+                    .unwrap()
+                    .and_hms_opt(9, 10, 11)
+                    .unwrap(),
+            },
+            uuid: app_state.uuid.clone(),
+        };
+
+        return HtmlResponse(template);
+    }
+
+    let result = read_card_query(&app_state.pool, params.0, params.1).await;
+
+    if let Ok(card) = result {
+        let template = EditCardTemplate {
+            deck_id: params.0,
+            card_index: params.2,
+            card: card.get(0).cloned().unwrap(),
+            uuid: app_state.uuid.clone(),
+        };
+
+        return HtmlResponse(template);
+    } else {
+        let template = EditCardTemplate {
+            deck_id: params.0,
+            card_index: params.2,
+            card: Card {
+                id: 0,
+                deck_id: 0,
+                related_card_ids: Vec::new(),
+                from_text: String::from("Not found"),
+                to_text_primary: String::from("Not found"),
+                to_text_secondary: None,
+                example_text: None,
+                audio_url: None,
+                seen_at: chrono::NaiveDate::from_ymd_opt(2016, 7, 8)
+                    .unwrap()
+                    .and_hms_opt(9, 10, 11)
+                    .unwrap(),
+                seen_for: None,
+                rating: 0,
+                prev_rating: 0,
+                created_at: chrono::NaiveDate::from_ymd_opt(2016, 7, 8)
+                    .unwrap()
+                    .and_hms_opt(9, 10, 11)
+                    .unwrap(),
+                updated_at: chrono::NaiveDate::from_ymd_opt(2016, 7, 8)
+                    .unwrap()
+                    .and_hms_opt(9, 10, 11)
+                    .unwrap(),
+            },
+            uuid: app_state.uuid.clone(),
+        };
+
+        HtmlResponse(template)
+    }
 }
 
 // api route handlers
