@@ -2,10 +2,11 @@
 
 {% block main %}
 
-{% set text = "Square Cards" %}
-{% include "heading.html" %}
+<h1 class="text-2xl font-sans text-purple-800">
+    Square Cards
+</h1>
 
-<ul>
+<ul class="py-12">
     {% for deck in decks %}
 
     <li class="py-4">

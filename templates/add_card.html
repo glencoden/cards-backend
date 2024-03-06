@@ -2,7 +2,7 @@
 
 {% block main %}
 
-<a href="/action/{{ deck_id }}/{{ card_index }}/from">
+<a href="/action/{{ deck.id }}/{{ card_index }}/from">
     {% set label = "zurück" %}
     {% include "button.html" %}
 </a>
@@ -11,33 +11,34 @@
 {% include "heading.html" %}
 
 <form
-    hx-post="/api/cards/{{ deck_id }}?uuid={{ uuid }}"
-    hx-on::after-request="location.href = '/action/{{ deck_id }}/{{ card_index }}/from';"
+    hx-post="/api/cards/{{ deck.id }}?uuid={{ uuid }}"
+    hx-target="#response-target"
+    hx-on::after-request="location.href = '/action/{{ deck.id }}/{{ card_index }}/from';"
     class="flex flex-col gap-4"
 >
     <div class="flex flex-col">
         <label for="from" class="block text-sm font-medium leading-6 text-gray-900">
-            from
+            {{ deck.from_language }}
         </label>
         <input
             type="text"
             name="from_text"
             id="from"
             class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-            placeholder="from"
+            placeholder="{{ deck.from_language }}"
         />
     </div>
 
     <div class="flex flex-col">
         <label for="to" class="block text-sm font-medium leading-6 text-gray-900">
-            to
+            {{ deck.to_language_primary }}
         </label>
         <input
             type="text"
             name="to_text_primary"
             id="to"
             class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-            placeholder="to"
+            placeholder="{{ deck.to_language_primary }}"
         />
     </div>
 
@@ -49,5 +50,7 @@
         {% include "button.html" %}
     </button>
 </form>
+
+<div id="response-target" class="hidden"></div>
 
 {% endblock %}

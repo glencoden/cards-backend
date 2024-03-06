@@ -31,38 +31,112 @@
     {% include "card.html" %}
 </div>
 
+<script type="text/javascript">
+    const renderedAt = Date.now();
+
+    let timeoutId;
+
+    window.addEventListener('beforeunload', function () {
+        clearTimeout(timeoutId);
+        window.removeEventListener('beforeunload', this);
+    });
+
+    function updateSeenFor() {
+        const seenForInputs = document.getElementsByClassName('seen_for_input');
+        const currentTime = Date.now();
+        for (let i = 0; i < seenForInputs.length; i++) {
+            seenForInputs[i].value = currentTime - renderedAt;
+        }
+        timeoutId = setTimeout(updateSeenFor, 200);
+    }
+
+    updateSeenFor();
+</script>
+
 <div class="flex justify-between">
     {% set next_index = index + 1 %}
-    <a href="/action/{{ deck_id }}/{{ next_index }}/{{ random }}">
-        <span class="rounded-md shadow-sm bg-blue-400 px-4 py-3"></span>
-    </a>
-    <a href="/action/{{ deck_id }}/{{ next_index }}/{{ random }}">
-        <span class="rounded-md shadow-sm bg-blue-500 px-4 py-3"></span>
-    </a>
-    <a href="/action/{{ deck_id }}/{{ next_index }}/{{ random }}">
-        <span class="rounded-md shadow-sm bg-teal-600 px-4 py-3"></span>
-    </a>
-    <a href="/action/{{ deck_id }}/{{ next_index }}/{{ random }}">
-        <span class="rounded-md shadow-sm bg-green-600 px-4 py-3"></span>
-    </a>
-    <a href="/action/{{ deck_id }}/{{ next_index }}/{{ random }}">
-        <span class="rounded-md shadow-sm bg-lime-500 px-4 py-3"></span>
-    </a>
-    <a href="/action/{{ deck_id }}/{{ next_index }}/{{ random }}">
-        <span class="rounded-md shadow-sm bg-yellow-300 px-4 py-3"></span>
-    </a>
-    <a href="/action/{{ deck_id }}/{{ next_index }}/{{ random }}">
-        <span class="rounded-md shadow-sm bg-yellow-500 px-4 py-3"></span>
-    </a>
-    <a href="/action/{{ deck_id }}/{{ next_index }}/{{ random }}">
-        <span class="rounded-md shadow-sm bg-orange-500 px-4 py-3"></span>
-    </a>
-    <a href="/action/{{ deck_id }}/{{ next_index }}/{{ random }}">
-        <span class="rounded-md shadow-sm bg-orange-600 px-4 py-3"></span>
-    </a>
-    <a href="/action/{{ deck_id }}/{{ next_index }}/{{ random }}">
-        <span class="rounded-md shadow-sm bg-red-700 px-4 py-3"></span>
-    </a>
+    <form
+        hx-put="/api/cards/{{ deck_id }}/{{ card.id }}?uuid={{ uuid }}"
+        hx-target="#response-target"
+        hx-on::after-request="location.href = '/action/{{ deck_id }}/{{ next_index }}/{{ random }}';"
+        class="flex flex-col gap-4"
+    >
+        <input
+            class="seen_for_input hidden"
+            type="number"
+            name="seen_for"
+            value="0"
+        />
+        <input
+            type="number"
+            name="rating"
+            class="hidden"
+            value="1"
+        />
+        <button type="submit" class="w-16 h-10 rounded-md shadow-sm bg-blue-600 hover:opacity-70 active:scale-110"></button>
+    </form>
+    <form
+        hx-put="/api/cards/{{ deck_id }}/{{ card.id }}?uuid={{ uuid }}"
+        hx-target="#response-target"
+        hx-on::after-request="location.href = '/action/{{ deck_id }}/{{ next_index }}/{{ random }}';"
+        class="flex flex-col gap-4"
+    >
+        <input
+            class="seen_for_input hidden"
+            type="number"
+            name="seen_for"
+            value="0"
+        />
+        <input
+            type="number"
+            name="rating"
+            class="hidden"
+            value="2"
+        />
+        <button type="submit" class="w-16 h-10 rounded-md shadow-sm bg-blue-300 hover:opacity-70 active:scale-110"></button>
+    </form>
+    <form
+        hx-put="/api/cards/{{ deck_id }}/{{ card.id }}?uuid={{ uuid }}"
+        hx-target="#response-target"
+        hx-on::after-request="location.href = '/action/{{ deck_id }}/{{ next_index }}/{{ random }}';"
+        class="flex flex-col gap-4"
+    >
+        <input
+            class="seen_for_input hidden"
+            type="number"
+            name="seen_for"
+            value="0"
+        />
+        <input
+            type="number"
+            name="rating"
+            class="hidden"
+            value="3"
+        />
+        <button type="submit" class="w-16 h-10 rounded-md shadow-sm bg-orange-400 hover:opacity-70 active:scale-110"></button>
+    </form>
+    <form
+        hx-put="/api/cards/{{ deck_id }}/{{ card.id }}?uuid={{ uuid }}"
+        hx-target="#response-target"
+        hx-on::after-request="location.href = '/action/{{ deck_id }}/{{ next_index }}/{{ random }}';"
+        class="flex flex-col gap-4"
+    >
+        <input
+            class="seen_for_input hidden"
+            type="number"
+            name="seen_for"
+            value="0"
+        />
+        <input
+            type="number"
+            name="rating"
+            class="hidden"
+            value="4"
+        />
+        <button type="submit" class="w-16 h-10 rounded-md shadow-sm bg-red-600 hover:opacity-70 active:scale-110"></button>
+    </form>
 </div>
+
+<div id="response-target" class="hidden"></div>
 
 {% endblock %}

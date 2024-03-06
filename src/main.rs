@@ -33,7 +33,7 @@ struct UserForm {
     email: Option<String>,
 }
 
-#[derive(serde::Serialize)]
+#[derive(Clone, serde::Serialize)]
 struct Deck {
     id: i32,
     user_id: i32,
@@ -155,7 +155,7 @@ struct ActionTemplate {
 #[derive(Template)]
 #[template(path = "add_card.html")]
 struct AddCardTemplate {
-    deck_id: i32,
+    deck: Deck,
     card_index: i32,
     uuid: String,
 }
@@ -163,9 +163,9 @@ struct AddCardTemplate {
 #[derive(Template)]
 #[template(path = "edit_card.html")]
 struct EditCardTemplate {
-    deck_id: i32,
-    card_index: i32,
+    deck: Deck,
     card: Card,
+    card_index: i32,
     uuid: String,
 }
 
@@ -366,13 +366,49 @@ async fn page_add_card(
     State(app_state): State<Arc<AppState>>,
     Path(params): Path<(i32, i32)>,
 ) -> impl IntoResponse {
-    let template = AddCardTemplate {
-        deck_id: params.0,
-        card_index: params.1,
-        uuid: app_state.uuid.clone(),
-    };
+    let result = read_deck(
+        &app_state.pool,
+        params.0,
+        app_state.user.as_ref().unwrap().id,
+    )
+    .await;
 
-    HtmlResponse(template)
+    if let Ok(deck) = result {
+        let template = AddCardTemplate {
+            deck: deck.get(0).cloned().unwrap(),
+            card_index: params.1,
+            uuid: app_state.uuid.clone(),
+        };
+
+        HtmlResponse(template)
+    } else {
+        let template = AddCardTemplate {
+            deck: Deck {
+                id: 0,
+                user_id: 0,
+                from_language: String::from("Not found"),
+                to_language_primary: String::from("Not found"),
+                to_language_secondary: None,
+                design_key: None,
+                seen_at: chrono::NaiveDate::from_ymd_opt(2016, 7, 8)
+                    .unwrap()
+                    .and_hms_opt(9, 10, 11)
+                    .unwrap(),
+                created_at: chrono::NaiveDate::from_ymd_opt(2016, 7, 8)
+                    .unwrap()
+                    .and_hms_opt(9, 10, 11)
+                    .unwrap(),
+                updated_at: chrono::NaiveDate::from_ymd_opt(2016, 7, 8)
+                    .unwrap()
+                    .and_hms_opt(9, 10, 11)
+                    .unwrap(),
+            },
+            card_index: params.1,
+            uuid: app_state.uuid.clone(),
+        };
+
+        HtmlResponse(template)
+    }
 }
 
 async fn page_edit_card(
@@ -381,10 +417,43 @@ async fn page_edit_card(
     Query(query): Query<HashMap<String, String>>,
 ) -> impl IntoResponse {
     let uuid = query.get("uuid");
-    if app_state.user.is_none() || uuid.is_none() || uuid.unwrap() != &app_state.uuid {
+
+    let deck_result = read_deck(
+        &app_state.pool,
+        params.0,
+        app_state.user.as_ref().unwrap().id,
+    )
+    .await;
+
+    let card_result = read_card_query(&app_state.pool, params.0, params.1).await;
+
+    if app_state.user.is_none()
+        || uuid.is_none()
+        || uuid.unwrap() != &app_state.uuid
+        || deck_result.is_err()
+        || card_result.is_err()
+    {
         let template = EditCardTemplate {
-            deck_id: params.0,
-            card_index: params.2,
+            deck: Deck {
+                id: 0,
+                user_id: 0,
+                from_language: String::from("Not found"),
+                to_language_primary: String::from("Not found"),
+                to_language_secondary: None,
+                design_key: None,
+                seen_at: chrono::NaiveDate::from_ymd_opt(2016, 7, 8)
+                    .unwrap()
+                    .and_hms_opt(9, 10, 11)
+                    .unwrap(),
+                created_at: chrono::NaiveDate::from_ymd_opt(2016, 7, 8)
+                    .unwrap()
+                    .and_hms_opt(9, 10, 11)
+                    .unwrap(),
+                updated_at: chrono::NaiveDate::from_ymd_opt(2016, 7, 8)
+                    .unwrap()
+                    .and_hms_opt(9, 10, 11)
+                    .unwrap(),
+            },
             card: Card {
                 id: 0,
                 deck_id: 0,
@@ -410,57 +479,29 @@ async fn page_edit_card(
                     .and_hms_opt(9, 10, 11)
                     .unwrap(),
             },
+            card_index: params.2,
             uuid: app_state.uuid.clone(),
         };
 
         return HtmlResponse(template);
     }
 
-    let result = read_card_query(&app_state.pool, params.0, params.1).await;
+    let template = EditCardTemplate {
+        deck: deck_result
+            .expect("should be defined")
+            .get(0)
+            .cloned()
+            .unwrap(),
+        card: card_result
+            .expect("should be defined")
+            .get(0)
+            .cloned()
+            .unwrap(),
+        card_index: params.2,
+        uuid: app_state.uuid.clone(),
+    };
 
-    if let Ok(card) = result {
-        let template = EditCardTemplate {
-            deck_id: params.0,
-            card_index: params.2,
-            card: card.get(0).cloned().unwrap(),
-            uuid: app_state.uuid.clone(),
-        };
-
-        return HtmlResponse(template);
-    } else {
-        let template = EditCardTemplate {
-            deck_id: params.0,
-            card_index: params.2,
-            card: Card {
-                id: 0,
-                deck_id: 0,
-                related_card_ids: Vec::new(),
-                from_text: String::from("Not found"),
-                to_text_primary: String::from("Not found"),
-                to_text_secondary: None,
-                example_text: None,
-                audio_url: None,
-                seen_at: chrono::NaiveDate::from_ymd_opt(2016, 7, 8)
-                    .unwrap()
-                    .and_hms_opt(9, 10, 11)
-                    .unwrap(),
-                seen_for: None,
-                rating: 0,
-                prev_rating: 0,
-                created_at: chrono::NaiveDate::from_ymd_opt(2016, 7, 8)
-                    .unwrap()
-                    .and_hms_opt(9, 10, 11)
-                    .unwrap(),
-                updated_at: chrono::NaiveDate::from_ymd_opt(2016, 7, 8)
-                    .unwrap()
-                    .and_hms_opt(9, 10, 11)
-                    .unwrap(),
-            },
-            uuid: app_state.uuid.clone(),
-        };
-
-        HtmlResponse(template)
-    }
+    return HtmlResponse(template);
 }
 
 // api route handlers
