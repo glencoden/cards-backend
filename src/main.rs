@@ -13,6 +13,7 @@ use serde_json::{json, Value};
 use sqlx::{
     postgres::PgPoolOptions, query_builder::QueryBuilder, Error as SqlxError, Pool, Postgres,
 };
+use std::sync::RwLock;
 use std::{collections::HashMap, env, net::SocketAddr, sync::Arc};
 use tower_http::services::ServeDir;
 
@@ -175,6 +176,7 @@ struct AppState {
     pool: Pool<Postgres>,
     user: Option<User>,
     uuid: String,
+    active_decks: RwLock<HashMap<i32, Vec<Card>>>,
 }
 
 // main
@@ -211,6 +213,7 @@ async fn main() -> Result<(), SqlxError> {
                 .unwrap(),
         }),
         uuid,
+        active_decks: RwLock::new(HashMap::new()),
     });
 
     let root_path = env::current_dir().unwrap();
@@ -273,7 +276,9 @@ async fn page_home(
 
     let result = read_decks_query(&app_state.pool, app_state.user.as_ref().unwrap().id).await;
 
-    if let Ok(decks) = result {
+    if let Ok(mut decks) = result {
+        decks.sort_by(|a, b| a.id.cmp(&b.id));
+
         let template = HomeTemplate { decks };
 
         HtmlResponse(template)
@@ -284,16 +289,112 @@ async fn page_home(
     }
 }
 
+async fn read_cards_and_set_deck_timestamp_query(
+    pool: &Pool<Postgres>,
+    deck_id: i32,
+    user_id: i32,
+) -> Result<Vec<Card>, SqlxError> {
+    update_deck_query(
+        pool,
+        deck_id,
+        DeckForm {
+            from_language: None,
+            to_language_primary: None,
+            to_language_secondary: None,
+            design_key: None,
+            seen_at: Some(chrono::Utc::now().naive_utc()),
+        },
+        user_id,
+    )
+    .await
+    .expect("should be defined");
+
+    read_cards_query(pool, deck_id).await
+}
+
 async fn page_action(
     State(app_state): State<Arc<AppState>>,
     Path(params): Path<(i32, usize, String)>,
 ) -> impl IntoResponse {
-    let result = read_cards_query(&app_state.pool, params.0).await;
+    if params.1 == 0 && params.2 == "from" {
+        let deck_result = read_deck(
+            &app_state.pool,
+            params.0,
+            app_state.user.as_ref().unwrap().id,
+        )
+        .await;
 
-    if let Ok(mut cards) = result {
-        cards.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+        let cards_result = read_cards_and_set_deck_timestamp_query(
+            &app_state.pool,
+            params.0,
+            app_state.user.as_ref().unwrap().id,
+        )
+        .await;
 
-        let card = cards.get(params.1).cloned();
+        if let Ok(mut cards) = cards_result {
+            if let Ok(decks) = deck_result {
+                let deck = decks.get(0).cloned().unwrap();
+
+                cards.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+
+                let mut weights: HashMap<i32, i32> = HashMap::new();
+
+                for card in &cards {
+                    // 1. All set to 4 after deck last seen
+
+                    if card.rating == 4 && deck.seen_at < card.updated_at {
+                        weights.insert(card.id, 1_000_000);
+                    }
+
+                    // 2. All unrated
+
+                    if card.rating == 0 {
+                        weights.insert(card.id, 100_000);
+                    }
+                }
+
+                let span = cards[0].updated_at - cards[cards.len() - 1].updated_at; // youngest - oldest
+
+                for card in &cards {
+                    // Continue if weights already include card id
+
+                    if weights.contains_key(&card.id) {
+                        continue;
+                    }
+
+                    // 3. If num < DAILY_REVIEW_COUNT, fill with youngest
+
+                    if weights.len() < 9 {
+                        weights.insert(card.id, 100_000);
+                    }
+
+                    // 4. Weight by rating times weight by last seen - ceil((youngest - current) / span * 4)
+                    // TODO: Weight by time looked at: max(lower_limit, min(x, upper_limit))
+
+                    let current_age = cards[0].updated_at - card.updated_at;
+
+                    let span_number = span.num_milliseconds() as f32;
+                    let current_age_number = current_age.num_milliseconds() as f32;
+
+                    let weight_by_last_seen: f32 =
+                        (current_age_number / span_number * 4_f32).ceil();
+
+                    weights.insert(card.id, card.rating + weight_by_last_seen as i32);
+                }
+
+                // Sort cards by weight
+
+                cards.sort_by(|a, b| weights.get(&b.id).cmp(&weights.get(&a.id)));
+
+                let mut decks = app_state.active_decks.write().unwrap();
+
+                decks.insert(params.0, cards);
+            }
+        }
+    }
+
+    if let Some(deck) = app_state.active_decks.read().unwrap().get(&params.0) {
+        let card = deck.get(params.1).cloned();
         let random_number = rand::thread_rng().gen_range(0..=2);
 
         let random = if random_number > 0 {
@@ -305,7 +406,7 @@ async fn page_action(
         if let Some(card) = card {
             let template = ActionTemplate {
                 card,
-                num_cards: cards.len() as i32,
+                num_cards: deck.len() as i32,
                 deck_id: params.0,
                 index: params.1,
                 side: params.2,
